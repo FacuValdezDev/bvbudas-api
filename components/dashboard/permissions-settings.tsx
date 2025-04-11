@@ -1,13 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getClientSupabaseClient } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/database.types"
 
-// Datos de ejemplo para permisos
+// Example data for permissions
 const permissionsData = [
   {
     id: "1",
@@ -77,7 +78,11 @@ const permissionsData = [
 export function PermissionsSettings() {
   const [permissions, setPermissions] = useState(permissionsData)
   const [success, setSuccess] = useState<string | null>(null)
-  const supabase = getClientSupabaseClient()
+  const [supabase, setSupabase] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabase(createClientComponentClient<Database>())
+  }, [])
 
   const handlePermissionChange = (permissionId: string, role: string, value: boolean) => {
     setPermissions(
@@ -98,10 +103,10 @@ export function PermissionsSettings() {
 
   const handleSave = async () => {
     try {
-      // Aquí se implementaría la lógica para guardar los permisos en la base de datos
-      // Por ejemplo, usando una tabla de permisos en Supabase
+      // Here you would implement the logic to save permissions to the database
+      // For example, using a table of permissions in Supabase
 
-      // Simulamos una operación exitosa
+      // Simulate a successful operation
       setSuccess("Permisos actualizados correctamente")
       setTimeout(() => setSuccess(null), 3000)
     } catch (error) {
@@ -144,7 +149,7 @@ export function PermissionsSettings() {
                   <Switch
                     checked={permission.roles.admin}
                     onCheckedChange={(value) => handlePermissionChange(permission.id, "admin", value)}
-                    disabled={permission.name === "Configuración del Sistema"} // Los administradores siempre tienen acceso a la configuración
+                    disabled={permission.name === "Configuración del Sistema"} // Administrators always have access to configuration
                   />
                 </TableCell>
                 <TableCell className="text-center">

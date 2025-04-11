@@ -1,37 +1,61 @@
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
-import { createMiddlewareClient } from "@supabase/auth-helpers-nextjs"
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { createClient, type SupabaseClientOptions } from "@supabase/supabase-js";
+import { Database } from "@/types/database.types";
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next()
-  const supabase = createMiddlewareClient({ req, res })
+  const res = NextResponse.next();
 
-  // Optimización: Usar una variable para almacenar la sesión
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
+  // Configuración tipo-safe del cliente Supabase
+  const supabaseOptions: SupabaseClientOptions<"public"> = {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    },
+    cookies: {
+      get: (name: string) => req.cookies.get(name)?.value,
+      set: (name: string, value: string, options: any) => {
+        res.cookies.set(name, value, options);
+      },
+      remove: (name: string, options: any) => {
+        res.cookies.set(name, "", options);
+      }
+    }
+  };
 
-  // Obtener la URL actual
-  const url = req.nextUrl.clone()
-  const isAuthPage = url.pathname === "/"
-  const isDashboardPage = url.pathname.startsWith("/dashboard")
+  const supabase = createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseOptions
+  );
 
-  // Si el usuario no está autenticado y está intentando acceder a una ruta protegida
-  if (!session && isDashboardPage) {
-    url.pathname = "/"
-    return NextResponse.redirect(url)
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    const url = req.nextUrl.clone();
+    const isAuthPage = url.pathname === "/";
+    const isDashboardPage = url.pathname.startsWith("/dashboard");
+
+    if (!session && isDashboardPage) {
+      url.pathname = "/";
+      return NextResponse.redirect(url);
+    }
+
+    if (session && isAuthPage) {
+      url.pathname = "/dashboard";
+      return NextResponse.redirect(url);
+    }
+
+    return res;
+  } catch (error) {
+    console.error("Middleware error:", error);
+    const url = req.nextUrl.clone();
+    url.pathname = "/";
+    return NextResponse.redirect(url);
   }
-
-  // Si el usuario está autenticado y está intentando acceder a la página de inicio de sesión
-  // Lo redirigimos al dashboard
-  if (session && isAuthPage) {
-    url.pathname = "/dashboard"
-    return NextResponse.redirect(url)
-  }
-
-  return res
 }
 
 export const config = {
   matcher: ["/", "/dashboard/:path*"],
-}
+};

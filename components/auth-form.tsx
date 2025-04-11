@@ -1,14 +1,14 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { getClientSupabaseClient } from "@/lib/supabase"
+import { createClient } from "../utils/supabase/client"
+import type { Database } from "@/types/database.types"
 
 export function AuthForm() {
   const [email, setEmail] = useState("")
@@ -17,11 +17,18 @@ export function AuthForm() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const router = useRouter()
-  const supabase = getClientSupabaseClient()
+  const [supabase, setSupabase] = useState<any>(null)
 
-  // Verificar si el usuario ya está autenticado al cargar el componente
+  // Initialize Supabase client only on the client side
+  useEffect(() => {
+    setSupabase(createClient<Database>())
+  }, [])
+
+  // Verify if the user is already authenticated when loading the component
   useEffect(() => {
     const checkSession = async () => {
+      if (!supabase) return
+
       const { data } = await supabase.auth.getSession()
       if (data.session) {
         router.push("/dashboard")
@@ -29,9 +36,9 @@ export function AuthForm() {
     }
 
     checkSession()
-  }, [])
+  }, [supabase, router])
 
-  // Manejar la tecla Enter para el formulario
+  // Handle Enter key for the form
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !loading) {
       e.preventDefault()
@@ -45,9 +52,14 @@ export function AuthForm() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validación básica para evitar peticiones innecesarias
+    // Basic validation to avoid unnecessary requests
     if (!email || !password) {
       setError("Por favor, completa todos los campos")
+      return
+    }
+
+    if (!supabase) {
+      setError("Error de inicialización del cliente")
       return
     }
 
@@ -56,7 +68,7 @@ export function AuthForm() {
     setSuccess(null)
 
     try {
-      // Optimización: Usar directamente la redirección del router en lugar de window.location
+      // Optimization: Use router redirection directly instead of window.location
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -68,7 +80,7 @@ export function AuthForm() {
 
       setSuccess("Inicio de sesión exitoso. Redirigiendo...")
 
-      // Usar router.push en lugar de window.location para una navegación más rápida
+      // Use router.push instead of window.location for faster navigation
       router.push("/dashboard")
     } catch (error: any) {
       setError(error.message || "Error al iniciar sesión")
@@ -99,7 +111,7 @@ export function AuthForm() {
           onChange={(e) => setEmail(e.target.value)}
           onKeyDown={handleKeyDown}
           required
-          className="h-11" // Altura aumentada para mejor experiencia táctil
+          className="h-11" // Increased height for better touch experience
           autoComplete="email"
         />
       </div>
@@ -117,7 +129,7 @@ export function AuthForm() {
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={handleKeyDown}
           required
-          className="h-11" // Altura aumentada para mejor experiencia táctil
+          className="h-11" // Increased height for better touch experience
           autoComplete="current-password"
         />
       </div>

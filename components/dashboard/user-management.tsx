@@ -17,9 +17,10 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Edit, Trash, UserPlus, Search } from "lucide-react"
-import { getClientSupabaseClient } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useIsMobile } from "@/hooks/use-mobile"
+import type { Database } from "@/types/database.types"
 
 interface User {
   id: string
@@ -37,6 +38,7 @@ export function UserManagement() {
   const [success, setSuccess] = useState<string | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const isMobile = useIsMobile()
+  const [supabase, setSupabase] = useState<any>(null)
 
   const [newUser, setNewUser] = useState({
     email: "",
@@ -47,9 +49,9 @@ export function UserManagement() {
   })
 
   const [dialogOpen, setDialogOpen] = useState(false)
-  const supabase = getClientSupabaseClient()
 
   useEffect(() => {
+    setSupabase(createClientComponentClient<Database>())
     fetchUsers()
   }, [])
 
@@ -58,15 +60,16 @@ export function UserManagement() {
       setLoading(true)
       setError(null)
 
-      // Obtener el token de sesión actual
-      const { data: sessionData } = await supabase.auth.getSession()
+      // Get the current session token
+      const supabaseClient = createClientComponentClient<Database>()
+      const { data: sessionData } = await supabaseClient.auth.getSession()
       const token = sessionData.session?.access_token
 
       if (!token) {
         throw new Error("No hay sesión activa")
       }
 
-      // Llamar a la API para obtener usuarios
+      // Call the API to get users
       const response = await fetch("/api/admin/list-users", {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -92,13 +95,13 @@ export function UserManagement() {
     try {
       setError(null)
 
-      // Validar campos
+      // Validate fields
       if (!newUser.email || !newUser.password || !newUser.name || !newUser.company) {
         setError("Todos los campos son obligatorios")
         return
       }
 
-      // Crear usuario a través de la API
+      // Create user through the API
       const response = await fetch("/api/admin/create-user", {
         method: "POST",
         headers: {
@@ -121,7 +124,7 @@ export function UserManagement() {
       setSuccess("Usuario creado correctamente")
       setDialogOpen(false)
 
-      // Resetear formulario
+      // Reset form
       setNewUser({
         email: "",
         password: "",
@@ -130,7 +133,7 @@ export function UserManagement() {
         role: "user",
       })
 
-      // Actualizar lista de usuarios
+      // Update user list
       fetchUsers()
 
       setTimeout(() => setSuccess(null), 3000)
@@ -165,7 +168,7 @@ export function UserManagement() {
     }
   }
 
-  // Filtrar usuarios por término de búsqueda
+  // Filter users by search term
   const filteredUsers = users.filter(
     (user) =>
       user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||

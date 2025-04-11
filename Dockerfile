@@ -1,53 +1,55 @@
-# Usar la imagen oficial de Node.js como base
+# Stage 1: Base image
 FROM node:20-alpine AS base
 
-# Instalar dependencias solo cuando sea necesario
+# Stage 2: Dependencies
 FROM base AS deps
-# Comprobar https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine para entender por qué se necesitan libc6-compat
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-
-# Instalar dependencias basadas en el gestor de paquetes preferido
 COPY package.json package-lock.json* ./
-RUN npm ci
+RUN npm ci --omit=dev
 
-# Reconstruir el código fuente solo cuando sea necesario
+# Stage 3: Builder
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Configuración de variables de entorno para la compilación
-ENV NEXT_TELEMETRY_DISABLED 1
+# Configure build-time environment variables (seguro para build args)
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG SUPABASE_SERVICE_ROLE_KEY
+
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    NODE_ENV=production \
+    NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL} \
+    NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
 
 RUN npm run build
 
-# Imagen de producción, copiar todos los archivos y ejecutar next
+# Stage 4: Runner (producción)
 FROM base AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs && \
+    mkdir -p /app/.next/cache && \
+    chown nextjs:nodejs /app/.next/cache
 
-COPY --from=builder /app/public ./public
-
-# Configurar los permisos adecuados para los directorios de caché de Next.js
-RUN mkdir .next
-RUN chown nextjs:nodejs .next
-
-# Copiar el resultado de la compilación de Next.js
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/.next/cache ./.next/cache
 
 USER nextjs
 
 EXPOSE 3000
 
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+    CMD curl -f http://localhost:3000 || exit 1
 
-# Comando para ejecutar la aplicación
 CMD ["node", "server.js"]

@@ -8,8 +8,13 @@ const inter = Inter({ subsets: ["latin"], display: "swap" })
 export const metadata = {
   title: "Portal de Acceso | Nombre de la Marca",
   description: "Página de inicio de sesión",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1",
     generator: 'v0.dev'
+}
+
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 }
 
 export default function RootLayout({

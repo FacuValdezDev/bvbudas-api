@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { getClientSupabaseClient } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/database.types"
 
 export default function DebugPage() {
   const [connectionStatus, setConnectionStatus] = useState<"checking" | "success" | "error">("checking")
@@ -12,23 +13,27 @@ export default function DebugPage() {
   const [userPassword, setUserPassword] = useState("")
   const [loginResult, setLoginResult] = useState<any>(null)
   const [supabaseConfig, setSupabaseConfig] = useState<any>(null)
-
-  const supabase = getClientSupabaseClient()
+  const [supabase, setSupabase] = useState<any>(null)
 
   useEffect(() => {
+    // Initialize Supabase client only on the client side
+    const supabaseClient = createClientComponentClient<Database>()
+    setSupabase(supabaseClient)
+
+    // Check Supabase configuration
+    setSupabaseConfig({
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL || "No configurado",
+      hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    })
+
+    // Check connection
     async function checkConnection() {
       try {
-        // Verificar la configuración de Supabase
-        setSupabaseConfig({
-          url: process.env.NEXT_PUBLIC_SUPABASE_URL || "No configurado",
-          hasAnonKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-        })
-
-        // Una simple consulta para verificar la conexión
-        const { data, error } = await supabase.from("_dummy_query").select("*").limit(1)
+        // A simple query to verify the connection
+        const { data, error } = await supabaseClient.from("_dummy_query").select("*").limit(1)
 
         if (error && error.code !== "PGRST116") {
-          // PGRST116 es "Relation _dummy_query does not exist", lo cual es esperado
+          // PGRST116 is "Relation _dummy_query does not exist", which is expected
           setConnectionStatus("error")
           setErrorMessage(error.message)
         } else {
@@ -44,6 +49,8 @@ export default function DebugPage() {
   }, [])
 
   const testLogin = async () => {
+    if (!supabase) return
+
     try {
       setLoginResult({ status: "checking" })
       const { data, error } = await supabase.auth.signInWithPassword({
@@ -62,6 +69,8 @@ export default function DebugPage() {
   }
 
   const checkSession = async () => {
+    if (!supabase) return
+
     try {
       const { data, error } = await supabase.auth.getSession()
 

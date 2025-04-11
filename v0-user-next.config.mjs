@@ -1,7 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false, // Cambiado a false para evitar renderizados dobles
-  swcMinify: true,
+  reactStrictMode: false,
   images: {
     domains: ['localhost'],
     remotePatterns: [
@@ -11,15 +10,13 @@ const nextConfig = {
       },
     ],
   },
-  // Configuración para Docker
+  // Configuration for Docker
   output: 'standalone',
-  // Optimizaciones para mejorar el rendimiento
+  // Disable experimental features that might cause issues
   experimental: {
-    optimizeCss: true,
+    optimizeCss: false,
     scrollRestoration: true,
-  },
-  // Transpilación de módulos específicos
-  transpilePackages: ['react-chartjs-2', 'chart.js'],
+  }
 }
 
 export default nextConfig

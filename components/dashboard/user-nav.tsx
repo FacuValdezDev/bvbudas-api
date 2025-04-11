@@ -2,6 +2,7 @@
 
 import type { User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +13,8 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { getClientSupabaseClient } from "@/lib/supabase"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/database.types"
 
 interface UserNavProps {
   user: User
@@ -20,15 +22,21 @@ interface UserNavProps {
 
 export function UserNav({ user }: UserNavProps) {
   const router = useRouter()
-  const supabase = getClientSupabaseClient()
+  const [supabase, setSupabase] = useState<any>(null)
+
+  useEffect(() => {
+    setSupabase(createClientComponentClient<Database>())
+  }, [])
 
   const handleSignOut = async () => {
+    if (!supabase) return
+
     await supabase.auth.signOut()
     router.push("/")
     router.refresh()
   }
 
-  // Obtener las iniciales del nombre de usuario o email
+  // Get initials from username or email
   const getInitials = () => {
     const email = user.email || ""
     if (user.user_metadata?.name) {

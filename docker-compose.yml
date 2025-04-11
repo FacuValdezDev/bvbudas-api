@@ -1,10 +1,13 @@
-version: '3'
+version: '3.8'
 
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+        - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
     ports:
       - "3000:3000"
     environment:
@@ -12,10 +15,20 @@ services:
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-    restart: always
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next/cache # Cache específica para mejor rendimiento
+      - /app/public/uploads:/app/public/uploads # Ejemplo para uploads persistentes
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      test: [ "CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
+      start_period: 40s # Más tiempo para Next.js en producción
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1.5G
